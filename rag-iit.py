@@ -29,7 +29,7 @@ uploaded_files = st.file_uploader(
 )
 
 if uploaded_files:
-    st.session_state.documents = []
+    st.session_state.documents = []  # reset on re-upload
 
     for pdf in uploaded_files:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -42,12 +42,12 @@ if uploaded_files:
 # ------------------ CREATE EMBEDDINGS ------------------
 if st.button("🚀 Create Embeddings"):
     if not st.session_state.documents:
-        st.warning("Upload PDFs first.")
+        st.warning("Please upload PDFs first.")
     else:
         with st.spinner("Creating embeddings..."):
             splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=150
+                chunk_size=1500,   # reduced API calls
+                chunk_overlap=100
             )
 
             chunks = splitter.split_documents(st.session_state.documents)
@@ -60,12 +60,14 @@ if st.button("🚀 Create Embeddings"):
                 chunks, embeddings
             )
 
-            st.success(f"Indexed {len(chunks)} chunks.")
+            st.success(f"Embeddings created for {len(chunks)} chunks.")
 
-# ------------------ QUERY ------------------
+# ------------------ QUERY SECTION ------------------
 if st.session_state.vectorstore:
     st.markdown("---")
-    query = st.text_input("Ask a question across all PDFs")
+    st.subheader("🔎 Ask Questions")
+
+    query = st.text_input("Ask something across all uploaded PDFs")
 
     if query:
         with st.spinner("Thinking..."):
@@ -74,11 +76,10 @@ if st.session_state.vectorstore:
                 temperature=0
             )
 
-            retriever = st.session_state.vectorstore.as_retriever(
-                search_kwargs={"k": 4}
+            # ✅ STABLE API (LangChain 1.x)
+            docs = st.session_state.vectorstore.similarity_search(
+                query, k=4
             )
-
-            docs = retriever.get_relevant_documents(query)
 
             context = "\n\n".join(d.page_content for d in docs)
 
@@ -92,10 +93,10 @@ Question:
 {query}
 """
 
-            answer = llm.invoke(prompt)
+            response = llm.invoke(prompt)
 
             st.subheader("✅ Answer")
-            st.write(answer.content)
+            st.write(response.content)
 
             with st.expander("📄 Source Chunks"):
                 for d in docs:
