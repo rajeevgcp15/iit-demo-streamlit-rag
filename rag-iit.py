@@ -6,11 +6,10 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import RetrievalQA
 
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="Multi-PDF RAG", layout="wide")
-st.title("📚 Multi-PDF RAG (OpenAI + LangChain + FAISS)")
+st.title("📚 Multi-PDF RAG (OpenAI + FAISS)")
 
 # ------------------ OPENAI KEY ------------------
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -30,7 +29,7 @@ uploaded_files = st.file_uploader(
 )
 
 if uploaded_files:
-    st.session_state.documents = []  # reset on re-upload
+    st.session_state.documents = []
 
     for pdf in uploaded_files:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -40,13 +39,12 @@ if uploaded_files:
 
     st.success(f"{len(uploaded_files)} PDFs loaded successfully.")
 
-# ------------------ CREATE EMBEDDINGS BUTTON ------------------
+# ------------------ CREATE EMBEDDINGS ------------------
 if st.button("🚀 Create Embeddings"):
     if not st.session_state.documents:
-        st.warning("Please upload PDFs first.")
+        st.warning("Upload PDFs first.")
     else:
         with st.spinner("Creating embeddings..."):
-
             splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=150
@@ -59,18 +57,15 @@ if st.button("🚀 Create Embeddings"):
             )
 
             st.session_state.vectorstore = FAISS.from_documents(
-                chunks,
-                embeddings
+                chunks, embeddings
             )
 
-            st.success(f"Embeddings created for {len(chunks)} chunks.")
+            st.success(f"Indexed {len(chunks)} chunks.")
 
-# ------------------ QUERY SECTION ------------------
+# ------------------ QUERY ------------------
 if st.session_state.vectorstore:
     st.markdown("---")
-    st.subheader("🔎 Ask Questions")
-
-    query = st.text_input("Ask something across all uploaded PDFs")
+    query = st.text_input("Ask a question across all PDFs")
 
     if query:
         with st.spinner("Thinking..."):
@@ -79,20 +74,30 @@ if st.session_state.vectorstore:
                 temperature=0
             )
 
-            qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                retriever=st.session_state.vectorstore.as_retriever(
-                    search_kwargs={"k": 4}
-                ),
-                return_source_documents=True
+            retriever = st.session_state.vectorstore.as_retriever(
+                search_kwargs={"k": 4}
             )
 
-            result = qa_chain(query)
+            docs = retriever.get_relevant_documents(query)
+
+            context = "\n\n".join(d.page_content for d in docs)
+
+            prompt = f"""
+Use the context below to answer the question.
+
+Context:
+{context}
+
+Question:
+{query}
+"""
+
+            answer = llm.invoke(prompt)
 
             st.subheader("✅ Answer")
-            st.write(result["result"])
+            st.write(answer.content)
 
             with st.expander("📄 Source Chunks"):
-                for doc in result["source_documents"]:
-                    st.write(doc.page_content)
+                for d in docs:
+                    st.write(d.page_content)
                     st.markdown("---")
