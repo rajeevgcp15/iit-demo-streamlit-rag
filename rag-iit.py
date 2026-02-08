@@ -1,12 +1,11 @@
 import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
 import tempfile
 import os
+
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
 # ------------------ PAGE CONFIG ------------------
@@ -76,7 +75,7 @@ if st.session_state.vectorstore:
     if query:
         with st.spinner("Thinking..."):
             llm = ChatOpenAI(
-                model_name="gpt-4o-mini",
+                model="gpt-4o-mini",
                 temperature=0
             )
 
